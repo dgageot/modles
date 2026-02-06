@@ -132,7 +132,7 @@ class ModelTable extends HTMLElement {
     return `<tr data-key="${k}" class="${sel ? "selected" : ""}${m.status === "deprecated" ? " status-deprecated" : ""}">` +
       `<td><input type="checkbox" class="compare-cb" data-key="${k}"${sel ? " checked" : ""}></td>` +
       `<td>${m._e.p}</td><td><a class="model-link" data-key="${k}">${m._e.n}</a></td>` +
-      `<td class="mono dim">${m._e.i}</td><td>${m._e.f}</td>` +
+      `<td class="mono dim id-cell"><span class="id-wrap">${m._e.i}<button class="icon-btn sm copy-id" data-id="${m._e.i}">${COPY_SVG}</button></span></td><td>${m._e.f}</td>` +
       `<td class="num">${cost(m.cost?.input)}</td><td class="num">${cost(m.cost?.output)}</td>` +
       `<td class="num">${fmt(m.limit?.context)}</td><td class="num">${fmt(m.limit?.output)}</td>` +
       `<td class="bool ${m.reasoning ? "yes" : "no"}">${yn(m.reasoning)}</td>` +
@@ -156,7 +156,7 @@ class ModelTable extends HTMLElement {
     const ch = 7.5, cm = 7.2, pd = 28;
     let p = 8, n = 5, i = 8, f = 6;
     for (const m of S.all) { p = Math.max(p, m.provider.length); n = Math.max(n, m.name.length); i = Math.max(i, m.id.length); f = Math.max(f, (m.family ?? "").length); }
-    const w = [34, Math.min(p * ch + pd, 200), Math.min(n * ch + pd, 280), Math.min(i * cm + pd, 320), Math.min(f * ch + pd, 160), 90, 90, 100, 90, 85, 65, 65, 75];
+    const w = [34, Math.min(p * ch + pd, 200), Math.min(n * ch + pd, 280), Math.min(i * cm + pd + 30, 350), Math.min(f * ch + pd, 160), 90, 90, 100, 90, 85, 65, 65, 75];
     const cg = document.createElement("colgroup");
     w.forEach((v) => { const c = document.createElement("col"); c.style.width = `${v}px`; cg.appendChild(c); });
     const t = this.querySelector("table"); t.style.tableLayout = "fixed"; t.prepend(cg);
@@ -177,6 +177,8 @@ class ModelTable extends HTMLElement {
     this.tb.onclick = (e) => {
       const cb = e.target.closest(".compare-cb");
       if (cb) { e.stopPropagation(); toggleCompare(cb.dataset.key, cb); emit("compare-changed"); return; }
+      const cp = e.target.closest(".copy-id");
+      if (cp) { e.stopPropagation(); const orig = cp.innerHTML; navigator.clipboard.writeText(cp.dataset.id); flashCopy(cp, orig); return; }
       const a = e.target.closest(".model-link");
       if (a) { e.preventDefault(); const m = this.map.get(a.dataset.key); if (m) emit("open-detail", m); }
     };
