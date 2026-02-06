@@ -8,24 +8,24 @@ const ROW_H = 34, OVERSCAN = 8;
 
 const ESC_RE = /[&<>"']/g;
 const ESC_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-const dash = (v, f) => v == null ? "—" : f(v);
 const esc = (s = "") => String(s ?? "").replace(ESC_RE, (c) => ESC_MAP[c]);
+const dash = (v, f) => v == null ? "—" : f(v);
 const fmt = (n) => dash(n, (v) => v.toLocaleString("en-US"));
 const cost = (n) => dash(n, (v) => `$${v.toFixed(2)}`);
 const yn = (v) => v ? "✓" : "—";
 
-function flashCopy(btn, orig, label) {
+function flashCopy(btn, text, label) {
+  const orig = btn.innerHTML;
+  navigator.clipboard.writeText(text);
   btn.innerHTML = label ? `${CHECK_SVG} ${label}` : CHECK_SVG;
   btn.classList.add("copied");
   setTimeout(() => { btn.innerHTML = orig; btn.classList.remove("copied"); }, 1500);
 }
 
-function copyBtn(sel, text) {
-  const btn = typeof sel === "string" ? this.querySelector(sel) : sel;
-  const orig = btn.innerHTML;
-  const isFn = typeof text === "function";
-  const getText = isFn ? text : () => text;
-  btn.onclick = (e) => { e.stopPropagation(); navigator.clipboard.writeText(getText()); flashCopy(btn, orig, isFn ? "Copied!" : null); };
+function setupCopy(root, sel, text) {
+  const btn = typeof sel === "string" ? root.querySelector(sel) : sel;
+  const isLazy = typeof text === "function";
+  btn.onclick = (e) => { e.stopPropagation(); flashCopy(btn, isLazy ? text() : text, isLazy ? "Copied!" : null); };
 }
 
 function showDialog(el, closeId) {
@@ -39,15 +39,18 @@ function showDialog(el, closeId) {
 // ── State ────────────────────────────────────────────────────
 
 const S = {
-  providers: {}, all: [], filtered: [], index: [], sortKeys: {},
-  sort: { col: "provider", dir: 1 }, compare: new Set(),
+  providers: {},
+  all: [],
+  filtered: [],
+  sort: { col: "provider", dir: 1 },
+  compare: new Set(),
 };
 
 const bus = new EventTarget();
 const emit = (n, d) => bus.dispatchEvent(new CustomEvent(n, { detail: d }));
 const on = (n, fn) => bus.addEventListener(n, (e) => fn(e.detail));
 
-// ── Columns (for thead + sort) ───────────────────────────────
+// ── Columns ──────────────────────────────────────────────────
 
 const COLS = [
   { id: "cmp" },
@@ -81,10 +84,9 @@ async function load() {
 
   for (const m of S.all) {
     m._key = `${m.pid}/${m.id}`;
-    m._e = { p: esc(m.provider), n: esc(m.name), i: esc(m.id), f: esc(m.family ?? "—") };
+    m._html = { p: esc(m.provider), n: esc(m.name), i: esc(m.id), f: esc(m.family ?? "—") };
+    m._search = `${m.provider}\t${m.pid}\t${m.name}\t${m.id}\t${m.family}`.toLowerCase();
   }
-  S.index = S.all.map((m) => `${m.provider}\t${m.pid}\t${m.name}\t${m.id}\t${m.family}`.toLowerCase());
-  for (const c of COLS) if (c.get) S.sortKeys[c.id] = S.all.map(c.get);
   S.filtered = S.all;
 }
 
@@ -96,25 +98,28 @@ class ModelTable extends HTMLElement {
     on("loaded", () => this.init());
     on("sorted", () => this.refresh());
     on("filtered", () => { this.counts(); this.scrollTop = 0; this.refresh(); });
-    on("compare-changed", () => this.refresh());
+    on("compare-changed", ({ key }) => this.toggleRow(key));
   }
 
   init() {
     this.sort();
     this.innerHTML = `<table><thead><tr>${this.thead()}</tr></thead><tbody></tbody></table>`;
     this.tb = this.querySelector("tbody");
-    this.map = new Map(S.all.map((m) => [m._key, m]));
-    this.countName = document.getElementById("count-name");
-    this.countProvider = document.getElementById("count-provider");
+    this.modelsByKey = new Map(S.all.map((m) => [m._key, m]));
     this.counts();
     this._w = [-1, -1]; this._raf = 0;
     this.addEventListener("scroll", () => { if (!this._raf) this._raf = requestAnimationFrame(() => { this._raf = 0; this.draw(); }); });
     this.listen();
     this.draw();
-    this.widths();
+    this.setColumnWidths();
   }
 
   refresh() { this.sort(); this.querySelector("thead tr").innerHTML = this.thead(); this._w = [-1, -1]; this.draw(); }
+
+  toggleRow(key) {
+    const row = this.tb.querySelector(`tr[data-key="${CSS.escape(key)}"]`);
+    if (row) row.classList.toggle("selected", S.compare.has(key));
+  }
 
   draw() {
     const n = S.filtered.length;
@@ -129,11 +134,11 @@ class ModelTable extends HTMLElement {
   }
 
   row(m) {
-    const k = m._key, sel = S.compare.has(k);
+    const k = m._key, sel = S.compare.has(k), h = m._html;
     return `<tr data-key="${k}" class="${sel ? "selected" : ""}${m.status === "deprecated" ? " status-deprecated" : ""}">` +
-      `<td class="cmp-cell"><input type="checkbox" class="compare-cb" data-key="${k}"${sel ? " checked" : ""}></td>` +
-      `<td>${m._e.p}</td><td><a class="model-link" data-key="${k}">${m._e.n}</a></td>` +
-      `<td class="mono dim id-cell"><span class="id-wrap"><a class="model-link" data-key="${k}">${m._e.i}</a><button class="icon-btn sm copy-id" data-id="${m._e.i}">${COPY_SVG}</button></span></td><td>${m._e.f}</td>` +
+      `<td class="cmp-cell"><label><input type="checkbox" class="compare-cb" data-key="${k}"${sel ? " checked" : ""}></label></td>` +
+      `<td>${h.p}</td><td><a class="model-link" data-key="${k}">${h.n}</a></td>` +
+      `<td class="mono dim id-cell"><span class="id-wrap"><a class="model-link" data-key="${k}">${h.i}</a><button class="icon-btn sm copy-id" data-id="${h.i}">${COPY_SVG}</button></span></td><td>${h.f}</td>` +
       `<td class="num">${cost(m.cost?.input)}</td><td class="num">${cost(m.cost?.output)}</td>` +
       `<td class="num">${fmt(m.limit?.context)}</td><td class="num">${fmt(m.limit?.output)}</td>` +
       `<td class="bool ${m.reasoning ? "yes" : "no"}">${yn(m.reasoning)}</td>` +
@@ -153,19 +158,34 @@ class ModelTable extends HTMLElement {
     }).join("");
   }
 
-  widths() {
-    const ch = 7.5, cm = 7.2, pd = 28;
-    let p = 8, n = 5, i = 8, f = 6;
-    for (const m of S.all) { p = Math.max(p, m.provider.length); n = Math.max(n, m.name.length); i = Math.max(i, m.id.length); f = Math.max(f, (m.family ?? "").length); }
-    const w = [34, Math.min(p * ch + pd, 200), Math.min(n * ch + pd, 280), Math.min(i * cm + pd + 30, 350), Math.min(f * ch + pd, 160), 90, 90, 100, 90, 85, 65, 65, 75];
+  setColumnWidths() {
+    const CH = 7.5, CH_MONO = 7.2, PAD = 28;
+    const mobile = matchMedia("(max-width: 700px)").matches;
+    let pLen = 8, nLen = 5, iLen = 8, fLen = 6;
+    for (const m of S.all) {
+      pLen = Math.max(pLen, m.provider.length);
+      nLen = Math.max(nLen, m.name.length);
+      iLen = Math.max(iLen, m.id.length);
+      fLen = Math.max(fLen, (m.family ?? "").length);
+    }
+    const w = [
+      34,
+      Math.min(pLen * CH + PAD, mobile ? 110 : 200),
+      Math.min(nLen * CH + PAD, mobile ? 180 : 280),
+      Math.min(iLen * CH_MONO + PAD + 30, mobile ? 200 : 350),
+      Math.min(fLen * CH + PAD, mobile ? 100 : 160),
+      90, 90, 100, 90, 85, 65, 65, 75,
+    ];
     const cg = document.createElement("colgroup");
     w.forEach((v) => { const c = document.createElement("col"); c.style.width = `${v}px`; cg.appendChild(c); });
     const t = this.querySelector("table"); t.style.tableLayout = "fixed"; t.prepend(cg);
   }
 
   counts() {
-    if (this.countName) this.countName.textContent = `(${S.filtered.length})`;
-    if (this.countProvider) this.countProvider.textContent = `(${new Set(S.filtered.map((m) => m.pid)).size})`;
+    const countName = document.getElementById("count-name");
+    const countProvider = document.getElementById("count-provider");
+    if (countName) countName.textContent = `(${S.filtered.length})`;
+    if (countProvider) countProvider.textContent = `(${new Set(S.filtered.map((m) => m.pid)).size})`;
   }
 
   listen() {
@@ -176,72 +196,61 @@ class ModelTable extends HTMLElement {
       emit("sorted");
     };
     this.tb.onclick = (e) => {
-      const cell = e.target.closest(".cmp-cell");
-      if (cell) {
-        e.stopPropagation();
-        const cb = cell.querySelector(".compare-cb");
-        if (e.target !== cb) cb.checked = !cb.checked;
-        toggleCompare(cb.dataset.key, cb); emit("compare-changed"); return;
-      }
+      if (e.target.closest(".cmp-cell")) { e.stopPropagation(); return; }
       const cp = e.target.closest(".copy-id");
-      if (cp) { e.stopPropagation(); const orig = cp.innerHTML; navigator.clipboard.writeText(cp.dataset.id); flashCopy(cp, orig); return; }
+      if (cp) { e.stopPropagation(); flashCopy(cp, cp.dataset.id); return; }
       const a = e.target.closest(".model-link");
-      if (a) { e.preventDefault(); const m = this.map.get(a.dataset.key); if (m) emit("open-detail", m); }
+      if (a) { e.preventDefault(); const m = this.modelsByKey.get(a.dataset.key); if (m) emit("open-detail", m); }
     };
+    this.tb.addEventListener("change", (e) => {
+      const cb = e.target.closest(".compare-cb");
+      if (!cb) return;
+      toggleCompare(cb.dataset.key, cb);
+      emit("compare-changed", { key: cb.dataset.key });
+    });
   }
 
   sort() {
     const col = COLS.find((c) => c.id === S.sort.col);
     if (!col?.get) return;
-    const dir = S.sort.dir, keys = S.sortKeys[col.id], n = S.all.length;
-    const idx = Array.from({ length: n }, (_, i) => i);
-    idx.sort((a, b) => {
-      let va = keys[a], vb = keys[b];
+    const dir = S.sort.dir, get = col.get;
+    S.all.sort((a, b) => {
+      let va = get(a), vb = get(b);
       if (va == null && vb == null) return 0;
       if (va == null) return 1; if (vb == null) return -1;
       if (typeof va === "boolean") { va = +va; vb = +vb; }
       return typeof va === "string" ? (va < vb ? -dir : va > vb ? dir : 0) : (va - vb) * dir;
     });
-    const pa = S.all.slice(), pi = S.index.slice(), pk = {};
-    for (const k in S.sortKeys) pk[k] = S.sortKeys[k].slice();
-    for (let i = 0; i < n; i++) { const s = idx[i]; S.all[i] = pa[s]; S.index[i] = pi[s]; for (const k in S.sortKeys) S.sortKeys[k][i] = pk[k][s]; }
-    if (S.filtered.length < n) { const set = new Set(S.filtered.map((m) => m._key)); S.filtered = S.all.filter((m) => set.has(m._key)); }
-    else S.filtered = S.all;
+    if (S.filtered.length < S.all.length) {
+      const keys = new Set(S.filtered.map((m) => m._key));
+      S.filtered = S.all.filter((m) => keys.has(m._key));
+    } else {
+      S.filtered = S.all;
+    }
   }
 }
 
 customElements.define("model-table", ModelTable);
 
 function toggleCompare(key, cb) {
-  if (S.compare.has(key)) {
-    S.compare.delete(key);
-    return;
-  }
-  if (S.compare.size < 4) {
-    S.compare.add(key);
-    return;
-  }
-  cb.checked = false;
+  if (S.compare.has(key)) { S.compare.delete(key); return; }
+  if (S.compare.size >= 4) { cb.checked = false; return; }
+  S.compare.add(key);
 }
 
-function bestIndexes(values, dir) {
-  const ok = values.filter((v) => v != null);
-  if (!ok.length) return new Set();
-  const target = dir === "lower" ? Math.min(...ok) : Math.max(...ok);
-  const best = new Set();
-  values.forEach((v, i) => { if (v === target) best.add(i); });
-  return best;
-}
+// ── Detail ───────────────────────────────────────────────────
 
 class ModelDetail extends HTMLElement {
   connectedCallback() { on("open-detail", (m) => this.show(m)); }
 
   show(m) {
     const p = S.providers[m.pid];
-    const b = (c, cls, t) => c ? `<span class="badge ${cls}">${t}</span>` : "";
+    const badge = (c, cls, t) => c ? `<span class="badge ${cls}">${t}</span>` : "";
     const kv = (l, v) => `<tr><td class="kl">${esc(l)}</td><td class="kv">${esc(String(v))}</td></tr>`;
 
-    const costs = [["Input", cost(m.cost?.input)], ["Output", cost(m.cost?.output)],
+    const costs = [
+      ["Input", cost(m.cost?.input)],
+      ["Output", cost(m.cost?.output)],
       m.cost?.reasoning != null && ["Reasoning", cost(m.cost.reasoning)],
       m.cost?.cache_read != null && ["Cache Read", cost(m.cost.cache_read)],
       m.cost?.cache_write != null && ["Cache Write", cost(m.cost.cache_write)],
@@ -253,12 +262,12 @@ class ModelDetail extends HTMLElement {
       <button class="dialog-close" id="cd">✕</button>
       <div class="d-hero">
         <div class="d-provider"><img src="${LOGO(m.pid)}" alt="" onerror="this.style.display='none'"> ${esc(p?.name ?? m.pid)}</div>
-        <h2 class="d-name">${m._e.n}</h2>
-        <div class="d-id-row"><code class="d-id">${m._e.i}</code><button class="icon-btn" id="cid">${COPY_SVG}</button></div>
+        <h2 class="d-name">${m._html.n}</h2>
+        <div class="d-id-row"><code class="d-id">${m._html.i}</code><button class="icon-btn" id="cid">${COPY_SVG}</button></div>
         <div class="d-badges">
-          ${b(m.reasoning, "b-green", "Reasoning")}${b(m.tool_call, "b-green", "Tools")}${b(m.structured_output, "b-green", "Structured")}
-          ${b(m.attachment, "b-dim", "Attachments")}${b(m.open_weights, "b-orange", "Open Weights")}
-          ${b(m.status === "deprecated", "b-red", "Deprecated")}${b(m.status === "beta", "b-orange", "Beta")}${b(m.status === "alpha", "b-red", "Alpha")}
+          ${badge(m.reasoning, "b-green", "Reasoning")}${badge(m.tool_call, "b-green", "Tools")}${badge(m.structured_output, "b-green", "Structured")}
+          ${badge(m.attachment, "b-dim", "Attachments")}${badge(m.open_weights, "b-orange", "Open Weights")}
+          ${badge(m.status === "deprecated", "b-red", "Deprecated")}${badge(m.status === "beta", "b-orange", "Beta")}${badge(m.status === "alpha", "b-red", "Alpha")}
         </div>
       </div>
       <div class="d-body">
@@ -268,8 +277,8 @@ class ModelDetail extends HTMLElement {
         <div class="d-card"><h3>Info</h3><table>${kv("Family", m.family ?? "—")}${kv("Knowledge", m.knowledge ?? "—")}${kv("Released", m.release_date ?? "—")}${kv("Updated", m.last_updated ?? "—")}</table></div>
       </div>
       <div class="dialog-footer"><button class="copy-all" id="ca">${COPY_SVG} Copy all</button></div>`;
-    copyBtn.call(this, "#cid", m.id);
-    copyBtn.call(this, "#ca", () => modelText(m));
+    setupCopy(this, "#cid", m.id);
+    setupCopy(this, "#ca", () => modelText(m));
     history.replaceState(null, "", `#${m._key}`);
     const dlg = showDialog(this, "cd");
     dlg.addEventListener("close", () => {
@@ -297,22 +306,31 @@ function modelText(m) {
 
 // ── Compare ──────────────────────────────────────────────────
 
-const CMP = [
-  ["Provider",         (m) => m.provider],
-  ["Model ID",         (m) => m.id,                      null, null, "id"],
-  ["Family",           (m) => m.family ?? "—"],
-  ["Input /M",         (m) => cost(m.cost?.input),     (m) => m.cost?.input,     "lower"],
-  ["Output /M",        (m) => cost(m.cost?.output),    (m) => m.cost?.output,    "lower"],
-  ["Reasoning /M",     (m) => cost(m.cost?.reasoning), (m) => m.cost?.reasoning, "lower"],
-  ["Context",          (m) => fmt(m.limit?.context),   (m) => m.limit?.context,  "higher"],
-  ["Max Input",        (m) => fmt(m.limit?.input),     (m) => m.limit?.input,    "higher"],
-  ["Max Output",       (m) => fmt(m.limit?.output),    (m) => m.limit?.output,   "higher"],
-  ["Reasoning",        (m) => yn(m.reasoning)],  ["Tools", (m) => yn(m.tool_call)],
-  ["Structured",       (m) => yn(m.structured_output)],
-  ["Open Weights",     (m) => m.open_weights ? "Open" : "Closed"],
-  ["Input Modalities", (m) => m.modalities?.input?.join(", ") ?? "—"],
-  ["Knowledge",        (m) => m.knowledge ?? "—"],  ["Released", (m) => m.release_date ?? "—"],
+const CMP_ROWS = [
+  { label: "Provider",         fn: (m) => m.provider },
+  { label: "Model ID",         fn: (m) => m.id, type: "id" },
+  { label: "Family",           fn: (m) => m.family ?? "—" },
+  { label: "Input /M",         fn: (m) => cost(m.cost?.input),     val: (m) => m.cost?.input,     best: "lower" },
+  { label: "Output /M",        fn: (m) => cost(m.cost?.output),    val: (m) => m.cost?.output,    best: "lower" },
+  { label: "Reasoning /M",     fn: (m) => cost(m.cost?.reasoning), val: (m) => m.cost?.reasoning, best: "lower" },
+  { label: "Context",          fn: (m) => fmt(m.limit?.context),   val: (m) => m.limit?.context,  best: "higher" },
+  { label: "Max Input",        fn: (m) => fmt(m.limit?.input),     val: (m) => m.limit?.input,    best: "higher" },
+  { label: "Max Output",       fn: (m) => fmt(m.limit?.output),    val: (m) => m.limit?.output,   best: "higher" },
+  { label: "Reasoning",        fn: (m) => yn(m.reasoning) },
+  { label: "Tools",            fn: (m) => yn(m.tool_call) },
+  { label: "Structured",       fn: (m) => yn(m.structured_output) },
+  { label: "Open Weights",     fn: (m) => m.open_weights ? "Open" : "Closed" },
+  { label: "Input Modalities", fn: (m) => m.modalities?.input?.join(", ") ?? "—" },
+  { label: "Knowledge",        fn: (m) => m.knowledge ?? "—" },
+  { label: "Released",         fn: (m) => m.release_date ?? "—" },
 ];
+
+function bestIndexes(values, dir) {
+  const ok = values.filter((v) => v != null);
+  if (!ok.length) return new Set();
+  const target = dir === "lower" ? Math.min(...ok) : Math.max(...ok);
+  return new Set(values.flatMap((v, i) => v === target ? [i] : []));
+}
 
 class ModelCompare extends HTMLElement {
   connectedCallback() { on("open-compare", () => this.show()); }
@@ -321,21 +339,23 @@ class ModelCompare extends HTMLElement {
     const ms = S.all.filter((m) => S.compare.has(m._key));
     if (ms.length < 2) return;
 
-    const trs = CMP.map(([label, fn, valFn, dir, type]) => {
-      const best = valFn && dir ? bestIndexes(ms.map(valFn), dir) : new Set();
+    const trs = CMP_ROWS.map((r) => {
+      const best = r.val && r.best ? bestIndexes(ms.map(r.val), r.best) : new Set();
       const tds = ms.map((m, i) => {
-        const c = best.has(i) ? ' class="best"' : "", t = esc(String(fn(m)));
-        return type === "id" ? `<td${c}><span class="cmp-id">${t} <button class="icon-btn sm cmp-copy" data-mid="${esc(m.id)}">${COPY_SVG}</button></span></td>` : `<td${c}>${t}</td>`;
+        const cls = best.has(i) ? ' class="best"' : "", text = esc(String(r.fn(m)));
+        return r.type === "id"
+          ? `<td${cls}><span class="cmp-id">${text} <button class="icon-btn sm cmp-copy" data-mid="${esc(m.id)}">${COPY_SVG}</button></span></td>`
+          : `<td${cls}>${text}</td>`;
       }).join("");
-      return `<tr><td>${esc(label)}</td>${tds}</tr>`;
+      return `<tr><td>${esc(r.label)}</td>${tds}</tr>`;
     }).join("");
 
     this.innerHTML = `
       <button class="dialog-close" id="cc">✕</button><h2>Compare models</h2>
-      <table><thead><tr><th></th>${ms.map((m) => `<th><div class="col-head">${m._e.n}<small>${m._e.p}</small></div></th>`).join("")}</tr></thead><tbody>${trs}</tbody></table>
+      <table><thead><tr><th></th>${ms.map((m) => `<th><div class="col-head">${m._html.n}<small>${m._html.p}</small></div></th>`).join("")}</tr></thead><tbody>${trs}</tbody></table>
       <div class="dialog-footer"><button class="copy-all" id="cca">${COPY_SVG} Copy all</button></div>`;
-    this.querySelectorAll(".cmp-copy").forEach((b) => copyBtn.call(this, b, b.dataset.mid));
-    copyBtn.call(this, "#cca", () => cmpText(ms));
+    this.querySelectorAll(".cmp-copy").forEach((b) => setupCopy(this, b, b.dataset.mid));
+    setupCopy(this, "#cca", () => cmpText(ms));
     showDialog(this, "cc");
   }
 }
@@ -343,20 +363,26 @@ class ModelCompare extends HTMLElement {
 customElements.define("model-compare", ModelCompare);
 
 function cmpText(ms) {
-  const ml = Math.max(...CMP.map(([l]) => l.length)), mn = Math.max(...ms.map((m) => m.name.length));
-  const p = (s, n) => s + " ".repeat(Math.max(0, n - s.length));
-  return ["Compare models", "", p("", ml + 2) + ms.map((m) => p(m.name, mn + 2)).join(""), "",
-    ...CMP.map(([l, fn]) => p(l, ml + 2) + ms.map((m) => p(String(fn(m)), mn + 2)).join(""))].join("\n");
+  const ml = Math.max(...CMP_ROWS.map((r) => r.label.length)), mn = Math.max(...ms.map((m) => m.name.length));
+  const pad = (s, n) => s + " ".repeat(Math.max(0, n - s.length));
+  return ["Compare models", "", pad("", ml + 2) + ms.map((m) => pad(m.name, mn + 2)).join(""), "",
+    ...CMP_ROWS.map((r) => pad(r.label, ml + 2) + ms.map((m) => pad(String(r.fn(m)), mn + 2)).join(""))].join("\n");
 }
 
 // ── Search / Shortcuts / Compare / Theme ─────────────────────
 
 const $s = document.getElementById("search");
+if (window.innerWidth > 700) {
+  $s.placeholder = 'Search by model, provider or family \u2014 e.g. "claude", "openai gpt", "gemini flash"';
+} else {
+  $s.removeAttribute("autofocus");
+  $s.blur();
+}
 $s.oninput = () => {
   const q = $s.value.trim().toLowerCase();
   if (!q) { S.filtered = S.all; } else {
     const terms = q.split(/\s+/);
-    S.filtered = S.all.filter((_, i) => { const h = S.index[i]; for (const t of terms) if (h.indexOf(t) === -1) return false; return true; });
+    S.filtered = S.all.filter((m) => terms.every((t) => m._search.includes(t)));
   }
   emit("filtered");
 };

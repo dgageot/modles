@@ -22,7 +22,8 @@
   --shadow: 0 6px 24px rgba(0,0,0,0.5); color-scheme: dark;
 }
 
-html { font: 14px/1.5 var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+html { font: 14px/1.5 var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; height: 100%; }
+body { display: flex; flex-direction: column; min-height: 100dvh; min-height: -webkit-fill-available; padding-bottom: env(safe-area-inset-bottom); }
 
 /* ── Utilities ────────────────────────────────────────────── */
 .dim, .no  { color: var(--text-dim); }
@@ -128,7 +129,7 @@ button {
 
 /* ── Table ────────────────────────────────────────────────── */
 model-table {
-  display: block; overflow: auto; height: calc(100dvh - 58px);
+  display: block; overflow: auto; flex: 1; min-height: 0;
 
   & table { width: 100%; border-collapse: collapse; white-space: nowrap; font-variant-numeric: tabular-nums; }
   & thead { position: sticky; top: 0; z-index: 10; }
@@ -251,12 +252,99 @@ model-compare {
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 700px) {
-  .bar { flex-wrap: wrap; }
-  .search-wrap { max-width: none; order: 10; flex-basis: 100%; & kbd { display: none; } }
-  dialog { max-width: 100vw; border-radius: 0; }
-  model-detail { padding: 28px 20px 32px; & .d-body { grid-template-columns: 1fr; } }
+  html { font-size: 14px; }
+
+  header { padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+
+  .bar { flex-wrap: wrap; padding: 8px 12px; gap: 8px; }
+
+  .brand { flex: 1; min-width: 0; }
+  .brand h1 { font-size: 16px; }
+
+  .search-wrap {
+    order: 10; flex-basis: 100%; max-width: none;
+    & kbd { display: none; }
+    & input { height: 40px; font-size: 16px; padding: 0 12px 0 36px; /* 16px prevents iOS zoom */ }
+    & input::placeholder { font-size: 13px; }
+  }
+
+  .bar-right { gap: 6px; }
+
+  #compare-btn {
+    padding: 0 10px; font-size: 12px; height: 36px;
+    & kbd { display: none; }
+  }
+
+  #theme-toggle, #github-link { width: 36px; height: 36px; }
+
+  /* Table */
+  model-table {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  model-table th, model-table td { padding: 8px 10px; }
+
+  model-table .compare-cb { width: 22px; height: 22px;
+    &:checked::after { left: 6px; top: 2px; width: 6px; height: 10px; }
+  }
+
+  model-table .cmp-cell { padding: 0; text-align: center; vertical-align: middle; }
+  model-table .cmp-cell label { display: flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; cursor: pointer; }
+
+  /* Always show copy buttons on mobile (no hover) */
+  model-table .id-cell .copy-id { opacity: 1; pointer-events: auto; }
+
+  .icon-btn { width: 32px; height: 32px; }
+  .icon-btn.sm { width: 28px; height: 28px; }
+
+  /* Dialogs */
+  dialog {
+    max-width: 100vw; width: 100vw !important; max-height: 92dvh;
+    border-radius: 12px; margin: auto;
+  }
+  dialog::backdrop { backdrop-filter: blur(6px); }
+
+  #detail-dialog { width: 100vw !important; }
+
+  model-detail {
+    padding: 16px 12px calc(12px + env(safe-area-inset-bottom));
+    & .d-hero { margin-bottom: 14px; }
+    & .d-name { font-size: 20px; margin-bottom: 4px; }
+    & .d-provider { font-size: 12px; margin-bottom: 4px; }
+    & .d-id { font-size: 11px; word-break: break-all; }
+    & .d-id-row { gap: 6px; margin-bottom: 8px; flex-wrap: wrap; justify-content: center; }
+    & .d-badges { gap: 4px; }
+    & .d-body { grid-template-columns: 1fr 1fr; gap: 8px; }
+    & .d-card { padding: 10px 12px; & h3 { font-size: 11px; margin-bottom: 6px; } & td { font-size: 12px; padding: 2px 0; } & td.kv { font-size: 12px; } }
+  }
+
+  .dialog-footer { margin-top: 12px; }
+
+  .dialog-close { top: 10px; right: 10px; width: 36px; height: 36px; font-size: 16px; line-height: 34px; }
+
+  /* Compare dialog */
+  #compare-dialog { width: 100vw !important; }
+
+  model-compare {
+    padding: 16px 6px calc(12px + env(safe-area-inset-bottom));
+    & h2 { font-size: 15px; margin-bottom: 10px; padding-left: 6px; }
+    & th, & td { padding: 6px 6px; font-size: 11px; }
+    & td:first-child { font-size: 11px; white-space: nowrap; }
+  }
+
+  /* Badges */
+  .badge { font-size: 11px; padding: 2px 8px; }
 }
 
 @media (max-width: 480px) {
   #github-link { display: none; }
+
+  .brand h1 { font-size: 15px; }
+  .powered-by { font-size: 9px; }
+
+  .compare-label { display: none; }
+  #compare-btn { padding: 0 10px; gap: 4px; }
+
+  model-table th, model-table td { padding: 7px 8px; font-size: 12px; }
+  model-table .mono { font-size: 11px; }
 }
