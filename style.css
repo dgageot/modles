@@ -255,3 +255,7 @@ model-compare {
   dialog { max-width: 100vw; border-radius: 0; }
   model-detail { padding: 28px 20px 32px; & .d-body { grid-template-columns: 1fr; } }
 }
+
+@media (max-width: 480px) {
+  #github-link { display: none; }
+}
