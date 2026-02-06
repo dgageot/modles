@@ -33,6 +33,7 @@ function showDialog(el, closeId) {
   dlg.showModal();
   el.querySelector(`#${closeId}`).onclick = () => dlg.close();
   dlg.onclick = (e) => { if (e.target === dlg) dlg.close(); };
+  return dlg;
 }
 
 // ── State ────────────────────────────────────────────────────
@@ -269,7 +270,11 @@ class ModelDetail extends HTMLElement {
       <div class="dialog-footer"><button class="copy-all" id="ca">${COPY_SVG} Copy all</button></div>`;
     copyBtn.call(this, "#cid", m.id);
     copyBtn.call(this, "#ca", () => modelText(m));
-    showDialog(this, "cd");
+    history.replaceState(null, "", `#${m._key}`);
+    const dlg = showDialog(this, "cd");
+    dlg.addEventListener("close", () => {
+      if (location.hash === `#${m._key}`) history.replaceState(null, "", location.pathname + location.search);
+    }, { once: true });
   }
 }
 
@@ -371,4 +376,18 @@ const theme = (t) => { document.documentElement.dataset.theme = t; localStorage.
 $t.onclick = () => theme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 theme(localStorage.getItem("theme") ?? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
 
-load().then(() => emit("loaded")).catch((e) => { document.querySelector("model-table").innerHTML = `<div class="empty">Failed: ${e.message}</div>`; });
+load().then(() => { emit("loaded"); openFromHash(); }).catch((e) => { document.querySelector("model-table").innerHTML = `<div class="empty">Failed: ${e.message}</div>`; });
+
+// ── Hash routing ─────────────────────────────────────────────
+
+function openFromHash() {
+  const key = decodeURIComponent(location.hash.slice(1));
+  if (!key) return;
+  const m = S.all.find((m) => m._key === key);
+  if (m) emit("open-detail", m);
+}
+
+window.addEventListener("hashchange", () => {
+  if (location.hash) openFromHash();
+  else document.getElementById("detail-dialog")?.close();
+});
