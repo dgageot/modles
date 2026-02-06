@@ -133,7 +133,7 @@ class ModelTable extends HTMLElement {
     return `<tr data-key="${k}" class="${sel ? "selected" : ""}${m.status === "deprecated" ? " status-deprecated" : ""}">` +
       `<td class="cmp-cell"><input type="checkbox" class="compare-cb" data-key="${k}"${sel ? " checked" : ""}></td>` +
       `<td>${m._e.p}</td><td><a class="model-link" data-key="${k}">${m._e.n}</a></td>` +
-      `<td class="mono dim id-cell"><span class="id-wrap">${m._e.i}<button class="icon-btn sm copy-id" data-id="${m._e.i}">${COPY_SVG}</button></span></td><td>${m._e.f}</td>` +
+      `<td class="mono dim id-cell"><span class="id-wrap"><a class="model-link" data-key="${k}">${m._e.i}</a><button class="icon-btn sm copy-id" data-id="${m._e.i}">${COPY_SVG}</button></span></td><td>${m._e.f}</td>` +
       `<td class="num">${cost(m.cost?.input)}</td><td class="num">${cost(m.cost?.output)}</td>` +
       `<td class="num">${fmt(m.limit?.context)}</td><td class="num">${fmt(m.limit?.output)}</td>` +
       `<td class="bool ${m.reasoning ? "yes" : "no"}">${yn(m.reasoning)}</td>` +

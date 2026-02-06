@@ -159,6 +159,7 @@ model-table {
   & tr.selected td { background: var(--accent-dim) !important; }
 
   & .model-link { color: var(--accent); text-decoration: none; cursor: pointer; font-weight: 500; &:hover { text-decoration: underline; } }
+  & .id-cell .model-link { color: var(--text-dim); font-weight: inherit; }
 
   & .cmp-cell { cursor: pointer; }
 
