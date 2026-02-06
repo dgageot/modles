@@ -1,4 +1,4 @@
-# Mod(le)s 🤖
+# mod(le)s.dev 🤖
 
 A faster, single-page alternative to [models.dev](https://models.dev), built on top of their awesome [open-source model data](https://github.com/nicepkg/models.dev).
 
