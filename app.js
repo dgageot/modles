@@ -130,7 +130,7 @@ class ModelTable extends HTMLElement {
   row(m) {
     const k = m._key, sel = S.compare.has(k);
     return `<tr data-key="${k}" class="${sel ? "selected" : ""}${m.status === "deprecated" ? " status-deprecated" : ""}">` +
-      `<td><input type="checkbox" class="compare-cb" data-key="${k}"${sel ? " checked" : ""}></td>` +
+      `<td class="cmp-cell"><input type="checkbox" class="compare-cb" data-key="${k}"${sel ? " checked" : ""}></td>` +
       `<td>${m._e.p}</td><td><a class="model-link" data-key="${k}">${m._e.n}</a></td>` +
       `<td class="mono dim id-cell"><span class="id-wrap">${m._e.i}<button class="icon-btn sm copy-id" data-id="${m._e.i}">${COPY_SVG}</button></span></td><td>${m._e.f}</td>` +
       `<td class="num">${cost(m.cost?.input)}</td><td class="num">${cost(m.cost?.output)}</td>` +
@@ -175,8 +175,13 @@ class ModelTable extends HTMLElement {
       emit("sorted");
     };
     this.tb.onclick = (e) => {
-      const cb = e.target.closest(".compare-cb");
-      if (cb) { e.stopPropagation(); toggleCompare(cb.dataset.key, cb); emit("compare-changed"); return; }
+      const cell = e.target.closest(".cmp-cell");
+      if (cell) {
+        e.stopPropagation();
+        const cb = cell.querySelector(".compare-cb");
+        if (e.target !== cb) cb.checked = !cb.checked;
+        toggleCompare(cb.dataset.key, cb); emit("compare-changed"); return;
+      }
       const cp = e.target.closest(".copy-id");
       if (cp) { e.stopPropagation(); const orig = cp.innerHTML; navigator.clipboard.writeText(cp.dataset.id); flashCopy(cp, orig); return; }
       const a = e.target.closest(".model-link");
