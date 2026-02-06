@@ -10,15 +10,15 @@
 
 [data-theme="light"] {
   --bg: #fafafa; --bg-alt: #f0f0f3; --bg-hover: #e8e8ed; --border: #dddde4;
-  --text: #2c2c3a; --text-dim: #70708a; --accent: #4d9f6e;
-  --accent-dim: rgba(77,159,110,0.07); --green: #1a9a4a; --red: #cc2d2d; --orange: #c07b0a;
+  --text: #2c2c3a; --text-dim: #70708a; --accent: #507c34;
+  --accent-dim: rgba(80,124,52,0.10); --green: #1a9a4a; --red: #cc2d2d; --orange: #c07b0a;
   --shadow: 0 6px 24px rgba(0,0,0,0.08); color-scheme: light;
 }
 
 [data-theme="dark"] {
   --bg: #111116; --bg-alt: #19191f; --bg-hover: #222230; --border: #2a2a38;
-  --text: #d4d4de; --text-dim: #6e6e88; --accent: #5cc98a;
-  --accent-dim: rgba(92,201,138,0.08); --green: #3ec96e; --red: #f06060; --orange: #e6a830;
+  --text: #d4d4de; --text-dim: #6e6e88; --accent: #98C379;
+  --accent-dim: rgba(152,195,121,0.10); --green: #3ec96e; --red: #f06060; --orange: #e6a830;
   --shadow: 0 6px 24px rgba(0,0,0,0.5); color-scheme: dark;
 }
 
