@@ -339,11 +339,18 @@ function bestIndexes(values, dir) {
 }
 
 class ModelCompare extends HTMLElement {
-  connectedCallback() { on("open-compare", () => this.show()); }
+  connectedCallback() { on("open-compare", (keys) => this.show(keys)); }
 
-  show() {
+  show(keys) {
+    if (keys) {
+      S.compare.clear();
+      keys.forEach((k) => S.compare.add(k));
+      emit("compare-changed", {});
+    }
     const ms = S.all.filter((m) => S.compare.has(m._key));
     if (ms.length < 2) return;
+
+    const compareHash = `#compare:${ms.map((m) => m._key).join(",")}`;
 
     const trs = CMP_ROWS.map((r) => {
       const best = r.val && r.best ? bestIndexes(ms.map(r.val), r.best) : new Set();
@@ -362,7 +369,11 @@ class ModelCompare extends HTMLElement {
       <div class="dialog-footer"><button class="copy-all" id="cca">${COPY_SVG} Copy all</button></div>`;
     this.querySelectorAll(".cmp-copy").forEach((b) => setupCopy(this, b, b.dataset.mid));
     setupCopy(this, "#cca", () => cmpText(ms));
-    showDialog(this, "cc");
+    history.replaceState(null, "", compareHash);
+    const dlg = showDialog(this, "cc");
+    dlg.addEventListener("close", () => {
+      if (location.hash === compareHash) history.replaceState(null, "", location.pathname + location.search);
+    }, { once: true });
   }
 }
 
@@ -422,14 +433,21 @@ load().then(() => { emit("loaded"); openFromHash(); }).catch((e) => { document.q
 
 // ── Hash routing ─────────────────────────────────────────────
 
+const COMPARE_PREFIX = "compare:";
+
 function openFromHash() {
-  const key = decodeURIComponent(location.hash.slice(1));
-  if (!key) return;
-  const m = S.all.find((m) => m._key === key);
+  const hash = decodeURIComponent(location.hash.slice(1));
+  if (!hash) return;
+  if (hash.startsWith(COMPARE_PREFIX)) {
+    const keys = hash.slice(COMPARE_PREFIX.length).split(",").filter(Boolean);
+    if (keys.length >= 2) emit("open-compare", keys);
+    return;
+  }
+  const m = S.all.find((m) => m._key === hash);
   if (m) emit("open-detail", m);
 }
 
 window.addEventListener("hashchange", () => {
   if (location.hash) openFromHash();
-  else document.getElementById("detail-dialog")?.close();
+  else { document.getElementById("detail-dialog")?.close(); document.getElementById("compare-dialog")?.close(); }
 });
