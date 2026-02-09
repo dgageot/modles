@@ -82,6 +82,12 @@ async function load() {
       S.all.push({ ...m, pid, provider: p.name });
   }
 
+  S.providerNames = new Map();
+  for (const [pid, p] of Object.entries(S.providers)) {
+    S.providerNames.set(pid.toLowerCase(), pid);
+    S.providerNames.set(p.name.toLowerCase(), pid);
+  }
+
   for (const m of S.all) {
     m._key = `${m.pid}/${m.id}`;
     m._html = { p: esc(m.provider), n: esc(m.name), i: esc(m.id), f: esc(m.family ?? "—") };
@@ -382,7 +388,17 @@ $s.oninput = () => {
   const q = $s.value.trim().toLowerCase();
   if (!q) { S.filtered = S.all; } else {
     const terms = q.split(/\s+/);
-    S.filtered = S.all.filter((m) => terms.every((t) => m._search.includes(t)));
+    const providerPids = new Set();
+    const textTerms = [];
+    for (const t of terms) {
+      const pid = S.providerNames.get(t);
+      if (pid) providerPids.add(pid);
+      else textTerms.push(t);
+    }
+    S.filtered = S.all.filter((m) => {
+      if (providerPids.size > 0 && !providerPids.has(m.pid)) return false;
+      return textTerms.every((t) => m._search.includes(t));
+    });
   }
   emit("filtered");
 };
