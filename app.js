@@ -366,7 +366,7 @@ class ModelCompare extends HTMLElement {
     this.innerHTML = `
       <button class="dialog-close" id="cc">✕</button><h2>Compare models</h2>
       <table><thead><tr><th></th>${ms.map((m) => `<th><div class="col-head">${m._html.n}<small>${m._html.p}</small></div></th>`).join("")}</tr></thead><tbody>${trs}</tbody></table>
-      <div class="dialog-footer"><button class="copy-all" id="cca">${COPY_SVG} Copy all</button></div>`;
+      <div class="dialog-footer"><button class="copy-all" id="cca">${COPY_SVG} Copy</button></div>`;
     this.querySelectorAll(".cmp-copy").forEach((b) => setupCopy(this, b, b.dataset.mid));
     setupCopy(this, "#cca", () => cmpText(ms));
     history.replaceState(null, "", compareHash);
@@ -380,10 +380,14 @@ class ModelCompare extends HTMLElement {
 customElements.define("model-compare", ModelCompare);
 
 function cmpText(ms) {
-  const ml = Math.max(...CMP_ROWS.map((r) => r.label.length)), mn = Math.max(...ms.map((m) => m.name.length));
   const pad = (s, n) => s + " ".repeat(Math.max(0, n - s.length));
-  return ["Compare models", "", pad("", ml + 2) + ms.map((m) => pad(m.name, mn + 2)).join(""), "",
-    ...CMP_ROWS.map((r) => pad(r.label, ml + 2) + ms.map((m) => pad(String(r.fn(m)), mn + 2)).join(""))].join("\n");
+  const cols = ["", ...ms.map((m) => m.name)];
+  const rows = CMP_ROWS.map((r) => [r.label, ...ms.map((m) => String(r.fn(m)))]);
+  const all = [cols, ...rows];
+  const widths = cols.map((_, i) => Math.max(...all.map((r) => r[i].length)));
+  const line = (r) => "| " + r.map((c, i) => pad(c, widths[i])).join(" | ") + " |";
+  const sep = "|" + widths.map((w) => "-".repeat(w + 2)).join("|") + "|";
+  return [line(cols), sep, ...rows.map(line)].join("\n");
 }
 
 // ── Search / Shortcuts / Compare / Theme ─────────────────────
