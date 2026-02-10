@@ -23,7 +23,7 @@
 }
 
 html { font: 14px/1.5 var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; height: 100%; }
-body { display: flex; flex-direction: column; min-height: 100dvh; min-height: -webkit-fill-available; padding-bottom: env(safe-area-inset-bottom); }
+body { display: flex; flex-direction: column; height: 100dvh; height: -webkit-fill-available; padding-bottom: env(safe-area-inset-bottom); }
 
 /* ── Utilities ────────────────────────────────────────────── */
 .dim, .no  { color: var(--text-dim); }
