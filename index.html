@@ -17,8 +17,11 @@
       </div>
       <div class="search-wrap">
         <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.45 4.39l3.58 3.58a1 1 0 01-1.42 1.42l-3.58-3.58A7 7 0 012 9z"/></svg>
-        <input id="search" type="search" placeholder="Search models…" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <div id="search-box">
+          <input id="search" type="text" placeholder="Search models…" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
         <kbd>⌘K</kbd>
+        <ul id="search-dropdown" class="search-dropdown" hidden></ul>
       </div>
       <div class="bar-right">
         <button id="compare-btn" disabled title="Select 2–4 models using the checkboxes, then click here to compare them side by side (⌘E)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> <span class="compare-label">Compare</span> <span id="compare-count">0</span> <kbd>⌘E</kbd></button>

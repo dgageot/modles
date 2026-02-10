@@ -393,34 +393,129 @@ function cmpText(ms) {
 // ── Search / Shortcuts / Compare / Theme ─────────────────────
 
 const $s = document.getElementById("search");
-if (window.innerWidth > 700) {
-  $s.placeholder = 'Search by model, provider or family \u2014 e.g. "claude", "openai gpt", "gemini flash"';
-} else {
-  $s.removeAttribute("autofocus");
-  $s.blur();
+const $box = document.getElementById("search-box");
+const $dd = document.getElementById("search-dropdown");
+const pills = [];       // [{ type: "provider"|"family", value, pid? }]
+let ddItems = [];       // current dropdown items
+let ddIdx = -1;         // highlighted index
+let suggestions = [];   // built after load
+
+function buildSuggestions() {
+  const provs = [], fams = new Set();
+  for (const [pid, p] of Object.entries(S.providers)) provs.push({ type: "provider", label: p.name, pid });
+  for (const m of S.all) if (m.family) fams.add(m.family);
+  suggestions = [
+    ...provs.sort((a, b) => a.label.localeCompare(b.label)).map((p) => ({ ...p, search: p.label.toLowerCase() })),
+    ...[...fams].sort().map((f) => ({ type: "family", label: f, search: f.toLowerCase() })),
+  ];
 }
-$s.oninput = () => {
+
+function matchSuggestions(q) {
+  if (!q) return suggestions.slice(0, 12);
+  const lq = q.toLowerCase();
+  const used = new Set(pills.map((p) => `${p.type}:${p.value}`));
+  return suggestions.filter((s) => s.search.includes(lq) && !used.has(`${s.type}:${s.label}`)).slice(0, 8);
+}
+
+function renderDropdown() {
+  const q = $s.value.trim();
+  ddItems = matchSuggestions(q);
+  ddIdx = -1;
+  if (!ddItems.length) { $dd.hidden = true; return; }
+  $dd.innerHTML = ddItems.map((s, i) =>
+    `<li data-idx="${i}"><span class="dd-type ${s.type}">${s.type}</span> ${esc(s.label)}</li>`
+  ).join("");
+  $dd.hidden = false;
+}
+
+function highlightDD(idx) {
+  ddIdx = idx;
+  $dd.querySelectorAll("li").forEach((li, i) => li.classList.toggle("active", i === idx));
+}
+
+function selectSuggestion(s) {
+  pills.push({ type: s.type, value: s.label, pid: s.pid });
+  renderPills();
+  $s.value = "";
+  $dd.hidden = true;
+  applyFilter();
+  $s.focus();
+}
+
+function removePill(idx) {
+  pills.splice(idx, 1);
+  renderPills();
+  applyFilter();
+  $s.focus();
+}
+
+function renderPills() {
+  $box.querySelectorAll(".pill").forEach((el) => el.remove());
+  pills.forEach((p, i) => {
+    const el = document.createElement("span");
+    el.className = `pill pill-${p.type}`;
+    el.innerHTML = `${esc(p.value)} <button data-idx="${i}">&times;</button>`;
+    el.querySelector("button").onclick = (e) => { e.stopPropagation(); removePill(i); };
+    $box.insertBefore(el, $s);
+  });
+  $s.placeholder = pills.length ? "" : "Search models\u2026";
+}
+
+function applyFilter() {
+  const provPids = new Set();
+  const famFilters = new Set();
+  for (const p of pills) {
+    if (p.type === "provider") provPids.add(p.pid);
+    if (p.type === "family") famFilters.add(p.value.toLowerCase());
+  }
   const q = $s.value.trim().toLowerCase();
-  if (!q) { S.filtered = S.all; } else {
-    const terms = q.split(/\s+/);
-    const providerPids = new Set();
-    const textTerms = [];
-    for (const t of terms) {
-      const pid = S.providerNames.get(t);
-      if (pid) providerPids.add(pid);
-      else textTerms.push(t);
-    }
+  const textTerms = q ? q.split(/\s+/) : [];
+
+  if (!provPids.size && !famFilters.size && !textTerms.length) {
+    S.filtered = S.all;
+  } else {
     S.filtered = S.all.filter((m) => {
-      if (providerPids.size > 0 && !providerPids.has(m.pid)) return false;
+      if (provPids.size && !provPids.has(m.pid)) return false;
+      if (famFilters.size && !famFilters.has((m.family ?? "").toLowerCase())) return false;
       return textTerms.every((t) => m._search.includes(t));
     });
   }
   emit("filtered");
+}
+
+if (window.innerWidth > 700) {
+  $s.placeholder = "Search models\u2026";
+} else {
+  $s.removeAttribute("autofocus");
+  $s.blur();
+}
+
+$s.oninput = () => { renderDropdown(); applyFilter(); };
+
+$s.onkeydown = (e) => {
+  if (e.key === "ArrowDown") { e.preventDefault(); if (!$dd.hidden) highlightDD(Math.min(ddIdx + 1, ddItems.length - 1)); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); if (!$dd.hidden) highlightDD(Math.max(ddIdx - 1, 0)); }
+  else if (e.key === "Enter") { e.preventDefault(); if (ddIdx >= 0 && ddItems[ddIdx]) selectSuggestion(ddItems[ddIdx]); }
+  else if (e.key === "Tab") { e.preventDefault(); renderDropdown(); if (ddItems.length) selectSuggestion(ddItems[0]); }
+  else if (e.key === "Escape") { $dd.hidden = true; }
+  else if (e.key === "Backspace" && !$s.value && pills.length) { removePill(pills.length - 1); }
 };
+
+$s.onfocus = () => renderDropdown();
+
+$dd.onmousedown = (e) => {
+  e.preventDefault();
+  const li = e.target.closest("li");
+  if (li) selectSuggestion(ddItems[+li.dataset.idx]);
+};
+
+$box.onclick = () => $s.focus();
+
+document.addEventListener("click", (e) => { if (!$box.contains(e.target) && !$dd.contains(e.target)) $dd.hidden = true; });
 
 document.onkeydown = (e) => {
   if (!(e.metaKey || e.ctrlKey)) return;
-  if (e.key === "k") { e.preventDefault(); $s.focus(); $s.select(); }
+  if (e.key === "k") { e.preventDefault(); $s.focus(); $s.select(); renderDropdown(); }
   if (e.key === "e") { e.preventDefault(); if (S.compare.size >= 2) emit("open-compare"); }
 };
 
@@ -433,7 +528,7 @@ const theme = (t) => { document.documentElement.dataset.theme = t; localStorage.
 $t.onclick = () => theme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 theme(localStorage.getItem("theme") ?? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
 
-load().then(() => { emit("loaded"); openFromHash(); }).catch((e) => { document.querySelector("model-table").innerHTML = `<div class="empty">Failed: ${e.message}</div>`; });
+load().then(() => { emit("loaded"); buildSuggestions(); openFromHash(); }).catch((e) => { document.querySelector("model-table").innerHTML = `<div class="empty">Failed: ${e.message}</div>`; });
 
 // ── Hash routing ─────────────────────────────────────────────
 
