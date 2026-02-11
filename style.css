@@ -262,6 +262,7 @@ model-detail {
   & .d-card {
     background: var(--bg-alt); border-radius: 8px; padding: 16px 18px;
     & h3 { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+    & h3.d-sub { font-size: 11px; color: var(--green); margin-top: 12px; margin-bottom: 8px; }
     & table { width: 100%; border-collapse: collapse; }
     & td { padding: 4px 0; font-size: 13px; border: none;
       &.kl { color: var(--text-dim); padding-right: 12px; }

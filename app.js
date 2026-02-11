@@ -264,6 +264,14 @@ class ModelDetail extends HTMLElement {
       m.cost?.output_audio != null && ["Audio Out", cost(m.cost.output_audio)],
     ].filter(Boolean);
 
+    const over200k = m.cost?.context_over_200k;
+    const costs200k = over200k ? [
+      ["Input", cost(over200k.input)],
+      ["Output", cost(over200k.output)],
+      over200k.cache_read != null && ["Cache Read", cost(over200k.cache_read)],
+      over200k.cache_write != null && ["Cache Write", cost(over200k.cache_write)],
+    ].filter(Boolean) : [];
+
     this.innerHTML = `
       <button class="dialog-close" id="cd">✕</button>
       <div class="d-hero">
@@ -277,7 +285,7 @@ class ModelDetail extends HTMLElement {
         </div>
       </div>
       <div class="d-body">
-        <div class="d-card"><h3>Pricing <span class="dim">per 1M tokens</span></h3><table>${costs.map(([l, v]) => kv(l, v)).join("")}</table></div>
+        <div class="d-card"><h3>Pricing <span class="dim">per 1M tokens</span></h3><table>${costs.map(([l, v]) => kv(l, v)).join("")}</table>${costs200k.length ? `<h3 class="d-sub">Over 200k context</h3><table>${costs200k.map(([l, v]) => kv(l, v)).join("")}</table>` : ""}</div>
         <div class="d-card"><h3>Limits</h3><table>${kv("Context", fmt(m.limit?.context))}${kv("Max Input", fmt(m.limit?.input))}${kv("Max Output", fmt(m.limit?.output))}</table></div>
         <div class="d-card"><h3>Modalities</h3><table>${kv("Input", m.modalities?.input?.join(", ") ?? "—")}${kv("Output", m.modalities?.output?.join(", ") ?? "—")}</table></div>
         <div class="d-card"><h3>Info</h3><table>${kv("Family", m.family ?? "—")}${kv("Knowledge", m.knowledge ?? "—")}${kv("Released", m.release_date ?? "—")}${kv("Updated", m.last_updated ?? "—")}</table></div>
@@ -298,12 +306,19 @@ customElements.define("model-detail", ModelDetail);
 function modelText(m) {
   const p = S.providers[m.pid];
   const caps = [m.reasoning && "Reasoning", m.tool_call && "Tools", m.structured_output && "Structured Output", m.open_weights && "Open Weights"].filter(Boolean);
+  const over200k = m.cost?.context_over_200k;
   return [
     m.name, `${p?.name ?? m.pid} · ${m.id}`, "", ...(caps.length ? [caps.join(", "), ""] : []),
     "Pricing (per 1M tokens)", `  Input:       ${cost(m.cost?.input)}`, `  Output:      ${cost(m.cost?.output)}`,
     ...(m.cost?.reasoning != null ? [`  Reasoning:   ${cost(m.cost.reasoning)}`] : []),
     ...(m.cost?.cache_read != null ? [`  Cache Read:  ${cost(m.cost.cache_read)}`] : []),
     ...(m.cost?.cache_write != null ? [`  Cache Write: ${cost(m.cost.cache_write)}`] : []),
+    ...(over200k ? [
+      "", "Over 200k context (per 1M tokens)",
+      `  Input:       ${cost(over200k.input)}`, `  Output:      ${cost(over200k.output)}`,
+      ...(over200k.cache_read != null ? [`  Cache Read:  ${cost(over200k.cache_read)}`] : []),
+      ...(over200k.cache_write != null ? [`  Cache Write: ${cost(over200k.cache_write)}`] : []),
+    ] : []),
     "", "Limits", `  Context:     ${fmt(m.limit?.context)}`, `  Max Input:   ${fmt(m.limit?.input)}`, `  Max Output:  ${fmt(m.limit?.output)}`,
     "", "Modalities", `  Input:       ${m.modalities?.input?.join(", ") ?? "—"}`, `  Output:      ${m.modalities?.output?.join(", ") ?? "—"}`,
     "", "Info", `  Family:      ${m.family ?? "—"}`, `  Knowledge:   ${m.knowledge ?? "—"}`, `  Released:    ${m.release_date ?? "—"}`,
@@ -319,6 +334,8 @@ const CMP_ROWS = [
   { label: "Input /M",         fn: (m) => cost(m.cost?.input),     val: (m) => m.cost?.input,     best: "lower" },
   { label: "Output /M",        fn: (m) => cost(m.cost?.output),    val: (m) => m.cost?.output,    best: "lower" },
   { label: "Reasoning /M",     fn: (m) => cost(m.cost?.reasoning), val: (m) => m.cost?.reasoning, best: "lower" },
+  { label: "Input /M >200k",   fn: (m) => cost(m.cost?.context_over_200k?.input),  val: (m) => m.cost?.context_over_200k?.input,  best: "lower",  when: (ms) => ms.some((m) => m.cost?.context_over_200k) },
+  { label: "Output /M >200k",  fn: (m) => cost(m.cost?.context_over_200k?.output), val: (m) => m.cost?.context_over_200k?.output, best: "lower",  when: (ms) => ms.some((m) => m.cost?.context_over_200k) },
   { label: "Context",          fn: (m) => fmt(m.limit?.context),   val: (m) => m.limit?.context,  best: "higher" },
   { label: "Max Input",        fn: (m) => fmt(m.limit?.input),     val: (m) => m.limit?.input,    best: "higher" },
   { label: "Max Output",       fn: (m) => fmt(m.limit?.output),    val: (m) => m.limit?.output,   best: "higher" },
@@ -352,7 +369,7 @@ class ModelCompare extends HTMLElement {
 
     const compareHash = `#compare:${ms.map((m) => m._key).join(",")}`;
 
-    const trs = CMP_ROWS.map((r) => {
+    const trs = CMP_ROWS.filter((r) => !r.when || r.when(ms)).map((r) => {
       const best = r.val && r.best ? bestIndexes(ms.map(r.val), r.best) : new Set();
       const tds = ms.map((m, i) => {
         const cls = best.has(i) ? ' class="best"' : "", text = esc(String(r.fn(m)));
@@ -382,7 +399,7 @@ customElements.define("model-compare", ModelCompare);
 function cmpText(ms) {
   const pad = (s, n) => s + " ".repeat(Math.max(0, n - s.length));
   const cols = ["", ...ms.map((m) => m.name)];
-  const rows = CMP_ROWS.map((r) => [r.label, ...ms.map((m) => String(r.fn(m)))]);
+  const rows = CMP_ROWS.filter((r) => !r.when || r.when(ms)).map((r) => [r.label, ...ms.map((m) => String(r.fn(m)))]);
   const all = [cols, ...rows];
   const widths = cols.map((_, i) => Math.max(...all.map((r) => r[i].length)));
   const line = (r) => "| " + r.map((c, i) => pad(c, widths[i])).join(" | ") + " |";
