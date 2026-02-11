@@ -427,16 +427,20 @@ function buildSuggestions() {
   ];
 }
 
+function lastTerm(q) {
+  const parts = q.trimEnd().split(/\s+/);
+  return q.endsWith(" ") ? "" : (parts.at(-1) ?? "");
+}
+
 function matchSuggestions(q) {
-  if (!q) return suggestions.slice(0, 12);
-  const lq = q.toLowerCase();
+  const lt = lastTerm(q).toLowerCase();
+  if (!lt) return suggestions.slice(0, 12);
   const used = new Set(pills.map((p) => `${p.type}:${p.value}`));
-  return suggestions.filter((s) => s.search.includes(lq) && !used.has(`${s.type}:${s.label}`)).slice(0, 8);
+  return suggestions.filter((s) => s.search.includes(lt) && !used.has(`${s.type}:${s.label}`)).slice(0, 8);
 }
 
 function renderDropdown() {
-  const q = $s.value.trim();
-  ddItems = matchSuggestions(q);
+  ddItems = matchSuggestions($s.value);
   ddIdx = -1;
   if (!ddItems.length) { $dd.hidden = true; return; }
   $dd.innerHTML = ddItems.map((s, i) =>
@@ -453,7 +457,9 @@ function highlightDD(idx) {
 function selectSuggestion(s) {
   pills.push({ type: s.type, value: s.label, pid: s.pid });
   renderPills();
-  $s.value = "";
+  const lt = lastTerm($s.value);
+  const prefix = lt ? $s.value.slice(0, $s.value.trimEnd().length - lt.length) : $s.value;
+  $s.value = prefix.trimEnd() ? prefix.trimEnd() + " " : "";
   $dd.hidden = true;
   applyFilter();
   $s.focus();
