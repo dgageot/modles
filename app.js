@@ -113,11 +113,26 @@ class ModelTable extends HTMLElement {
     this.tb = this.querySelector("tbody");
     this.modelsByKey = new Map(S.all.map((m) => [m._key, m]));
     this.counts();
+    this._rowH = ROW_H;
     this._w = [-1, -1]; this._raf = 0;
     this.addEventListener("scroll", () => { if (!this._raf) this._raf = requestAnimationFrame(() => { this._raf = 0; this.draw(); }); });
     this.listen();
     this.draw();
     this.setColumnWidths();
+    this.measureRow();
+    window.addEventListener("resize", () => this.measureRow());
+  }
+
+  // Re-render with the actual row height (mobile uses a 44px tap target).
+  measureRow() {
+    const sample = this.tb.querySelector("tr[data-key]");
+    if (!sample) return;
+    const h = sample.offsetHeight;
+    if (h > 0 && h !== this._rowH) {
+      this._rowH = h;
+      this._w = [-1, -1];
+      this.draw();
+    }
   }
 
   refresh() { this.sort(); this.querySelector("thead tr").innerHTML = this.thead(); this._w = [-1, -1]; this.draw(); }
@@ -129,13 +144,14 @@ class ModelTable extends HTMLElement {
 
   draw() {
     const n = S.filtered.length;
-    const s = Math.max(0, (this.scrollTop / ROW_H | 0) - OVERSCAN);
-    const e = Math.min(n, s + Math.ceil(this.clientHeight / ROW_H) + OVERSCAN * 2);
+    const rh = this._rowH;
+    const s = Math.max(0, (this.scrollTop / rh | 0) - OVERSCAN);
+    const e = Math.min(n, s + Math.ceil(this.clientHeight / rh) + OVERSCAN * 2);
     if (s === this._w[0] && e === this._w[1]) return;
     this._w = [s, e];
-    const rows = [spacerRow(s * ROW_H)];
+    const rows = [spacerRow(s * rh)];
     for (let i = s; i < e; i++) rows.push(this.row(S.filtered[i]));
-    rows.push(spacerRow(Math.max(0, (n - e) * ROW_H)));
+    rows.push(spacerRow(Math.max(0, (n - e) * rh)));
     this.tb.innerHTML = rows.join("");
   }
 
