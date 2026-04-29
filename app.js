@@ -150,14 +150,15 @@ class ModelTable extends HTMLElement {
     if (s === this._w[0] && e === this._w[1]) return;
     this._w = [s, e];
     const rows = [spacerRow(s * rh)];
-    for (let i = s; i < e; i++) rows.push(this.row(S.filtered[i]));
+    for (let i = s; i < e; i++) rows.push(this.row(S.filtered[i], i));
     rows.push(spacerRow(Math.max(0, (n - e) * rh)));
     this.tb.innerHTML = rows.join("");
   }
 
-  row(m) {
+  row(m, i) {
     const k = m._key, sel = S.compare.has(k), h = m._html;
-    return `<tr data-key="${k}" class="${sel ? "selected" : ""}${m.status === "deprecated" ? " status-deprecated" : ""}">` +
+    const cls = [sel && "selected", i % 2 && "row-alt", m.status === "deprecated" && "status-deprecated"].filter(Boolean).join(" ");
+    return `<tr data-key="${k}" class="${cls}">` +
       `<td class="cmp-cell"><label><input type="checkbox" class="compare-cb" data-key="${k}"${sel ? " checked" : ""}></label></td>` +
       `<td>${h.p}</td><td><a class="model-link" data-key="${k}">${h.n}</a></td>` +
       `<td class="mono dim id-cell"><span class="id-wrap"><a class="model-link" data-key="${k}">${h.i}</a><button class="icon-btn sm copy-id" data-id="${h.i}">${COPY_SVG}</button></span></td><td>${h.f}</td>` +

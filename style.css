@@ -196,7 +196,7 @@ model-table {
   }
 
   & tbody tr {
-    &:nth-child(even) td { background: var(--bg-alt); }
+    &.row-alt td { background: var(--bg-alt); }
     &:hover td { background: var(--bg-hover); }
   }
 
