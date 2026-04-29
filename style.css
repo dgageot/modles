@@ -22,8 +22,8 @@
   --shadow: 0 6px 24px rgba(0,0,0,0.5); color-scheme: dark;
 }
 
-html { font: 14px/1.5 var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; height: 100%; overscroll-behavior-x: none; }
-body { display: flex; flex-direction: column; height: 100dvh; height: -webkit-fill-available; padding-bottom: env(safe-area-inset-bottom); overscroll-behavior-x: none; }
+html { font: 14px/1.5 var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; height: 100%; overflow-x: hidden; overscroll-behavior-x: none; }
+body { display: flex; flex-direction: column; height: 100dvh; height: -webkit-fill-available; padding-bottom: env(safe-area-inset-bottom); overflow-x: hidden; overscroll-behavior-x: none; }
 
 /* ── Utilities ────────────────────────────────────────────── */
 .dim, .no  { color: var(--text-dim); }
